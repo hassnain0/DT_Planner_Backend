@@ -8,56 +8,59 @@ const generateToken = (id) => {
   });
 };
 
-exports.register = async (req, res) => {
-  try {
-    const { name, email, password, role, } = req.body;
+  exports.register = async (req, res) => {
+    try {
+      console.log("Body",req.body);
+      const { name, email, password, role }   = req.body;
 
-    // Check if user exists
+      // Check if user exists
+     // This check will work once the employeeId index is removed
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
+      // Hash password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+      // Engineers are not approved by default; admin is always approved
+      // const isApproved = role === "admin" ? true : false;
 
-    // Engineers are not approved by default; admin is always approved
-    // const isApproved = role === "admin" ? true : false;
-
-    // Create user
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role,
-    });
-
-    // If engineer not approved → don't return token
-    if (!user.isApproved) {
-      return res.status(201).json({
-        message: "Your account is created but waiting for admin approval.",
-        userId: user._id,
-        approved: false
+      // Create user
+      const user = await User.create({
+        name,
+        email,
+        password: hashedPassword,
+        role,
       });
+
+      // If engineer not approved → don't return token
+      if (!user.isApproved) {
+        return res.status(201).json({
+          message: "Your account is created but waiting for admin approval.",
+          userId: user._id,
+          approved: false,
+          sucess:true,
+        });
+      }
+
+      // Otherwise return token normally
+      const token = generateToken(user._id);
+
+      res.status(201).json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        approved: true,
+        sucess:true,
+        token
+      });
+
+    } catch (error) {
+      res.status(500).json({ message: error.message });
     }
-
-    // Otherwise return token normally
-    const token = generateToken(user._id);
-
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      approved: true,
-      token
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  };
 
 
 exports.login = async (req, res) => {
